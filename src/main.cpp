@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
-#include <WebServer.h>
+#include "ESPAsyncWebServer.h"
 #include <ArduinoJson.h>
 #include <ESP32Servo.h>
 #include <Wire.h>
@@ -16,23 +16,24 @@
 #define BME_CS 5
 
 // Variables and constants declarations
-const char* SSID = "Fa-miUnSenvisMic";
-const char* PWD = "CaminLaCheie";
+const char* SSID = "ThailandaaaSimple";
+const char* PWD = "GarsonieraLaCheie";
 
 StaticJsonDocument<250> jsonDocument;
 char buffer[350];
 int pos = 0;
 int previousPos = 0;
-int servoPin = 33;
+int servoPin = 15;
 
 float temperature;
 float pressure;
 float humidity;
+float iaqReference;
 float gas;
 float altitude;
 
 // Classes initialisation
-WebServer server(80);
+AsyncWebServer server(80);
 Adafruit_BME680 bme(BME_CS, BME_MOSI, BME_MISO, BME_SCK);
 Servo servo;
 
@@ -73,44 +74,40 @@ void add_json_object(char *tag, float value, char *unit) {
 void getTemperature() {
   Serial.println("Get temperature");
   create_json("temperature", temperature, "°C");
-  server.send(200, "application/json", buffer);
 }
 
 void getEnvPrincipal() {
   Serial.println("Get env");
   jsonDocument.clear();
   add_json_object("temperature", temperature, "°C");
-  add_json_object("pressure", pressure, "mBar");
+  add_json_object("pressure", pressure, "atm");
   add_json_object("humidity", humidity, "%");
   serializeJson(jsonDocument, buffer);
-  server.send(200, "application/json", buffer);
+  
 }
 
 void getEnvSecondary(){
   jsonDocument.clear();
-
   add_json_object("gas", gas, "kOhms");
+  add_json_object("iaq", iaqReference, "points");
   add_json_object("altitude", altitude, "m");
   serializeJson(jsonDocument, buffer);
-  server.send(200, "application/json", buffer);
 }
 
-// API functions - POST
-void handlePostHigh() {
-  digitalWrite(26, HIGH);
-  server.send(200, "application/json", "{}");
-}
+// // API functions - POST
+// void handlePostHigh() {
+//   digitalWrite(26, HIGH);
+//   server.send(200, "application/json", "{}");
+// }
 
-void handlePostLow() {
-  digitalWrite(26, LOW);
-  server.send(200, "application/json", "{}");
-}
+// void handlePostLow() {
+//   digitalWrite(26, LOW);
+//   server.send(200, "application/json", "{}");
+// }
 
-void handleServo(){
-  String body = server.arg("plain");
-  deserializeJson(jsonDocument, body);
-
-  int position = jsonDocument["position"];
+void handleServo(int position){
+ 
+  
   if(position > previousPos){
     for(pos = previousPos; pos<=position; pos++){
     servo.write(pos);
@@ -122,24 +119,37 @@ void handleServo(){
       delay(5);
     }
   }
-  
+  Serial.println(position);
   previousPos = position;
-  server.send(200, "application/json", "{}");
 }
-
 
 // Server routing and start
 void setup_routing() { 
 
   // GET
-  server.on("/temperature", getTemperature);	 	 	 
-  server.on("/envPrinc", getEnvPrincipal);	 	 
-  server.on("/envSec", getEnvSecondary);
+  server.on("/temperature",HTTP_GET, [](AsyncWebServerRequest *request){
+      getTemperature();
+      request -> send(200, "application/json", buffer);
+  });	 	 	 
+  server.on("/envPrinc",HTTP_GET, [](AsyncWebServerRequest *request){
+      getEnvPrincipal();
+      request -> send(200, "application/json", buffer);
+  });	 	 	 
+  server.on("/envSec",HTTP_GET, [](AsyncWebServerRequest *request){
+      getEnvSecondary();
+      request -> send(200, "application/json", buffer);
+  });	 	 	 
 
-  // POST
-  server.on("/ledHigh", handlePostHigh);
-  server.on("/ledLow", handlePostLow);
-  server.on("/servo", HTTP_POST, handleServo);
+  server.on("/servo", HTTP_POST, [](AsyncWebServerRequest *request){
+    String json = request->getParam("position")->value();
+    int position = json.toInt();
+    handleServo(position);
+    request -> send(200, "application/json", "Request made");
+  });
+
+  // // POST
+  // server.on("/ledHigh", handlePostHigh);
+  // server.on("/ledLow", handlePostLow);
   server.begin();	 	 
 }
 
@@ -149,11 +159,10 @@ void bmeSensorReadings(void * parameter){
       pressure = bme.readPressure();
       humidity = bme.readHumidity();
       gas = bme.readGas();
+      iaqReference = bme.gas_resistance/1000.0;
       altitude = bme.readAltitude(SEALEVELPRESSURE_HPA);
-      Serial.println("Read sensor data");
-      Serial.print(gas);
      // delay the task
-     vTaskDelay(10000 / portTICK_PERIOD_MS);
+     vTaskDelay(500 / portTICK_PERIOD_MS);
    }
 }
 
@@ -161,7 +170,7 @@ void setup_task() {
   xTaskCreate(	 	 
   bmeSensorReadings, 	 	 
   "Read sensor data", 	 	 
-  1000, 	 	 
+  2048, 	 	 
   NULL, 	 	 
   1, 	 	 
   NULL 	 	 
@@ -178,7 +187,7 @@ void setup(){
   // BME sensor setup
    if (!bme.begin()) {
     Serial.println(F("Could not find a valid BME680 sensor, check wiring!"));
-    while (1);
+    // while (1);
   }
 
   // Set up oversampling and filter initialization
@@ -192,5 +201,5 @@ void setup(){
 }
 
 void loop(){ 
-    server.handleClient();
+    
 }
