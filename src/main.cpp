@@ -129,8 +129,20 @@ float calculateIAQ(float gasResistance, float humidity)
   float iaq = 0;
 
   // Etapa 1: Calculul scorului de umiditate
-  // Etapa 1: Calculul scorului de umiditate
-  iaq += 0.5 * (humidityScore >= 0.5 ? (100 - humidityScore) : humidityScore);
+  float humidityWeight;
+  if (humidity > 60)
+  {
+    humidityWeight = 0.25;
+  }
+  else if (humidity < 40)
+  {
+    humidityWeight = 0.75;
+  }
+  else
+  {
+    humidityWeight = 0.5;
+  }
+  iaq += humidityWeight * (100 - humidityScore);
 
   // Etapa 2: Calculul scorului de gaz
   iaq += 0.25 * (gasScore >= 0.25 ? (1 - gasScore) : gasScore);
