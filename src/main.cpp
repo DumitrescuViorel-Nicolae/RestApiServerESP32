@@ -146,7 +146,7 @@ void bmeSensorReadings(void *parameter)
     pressure = bme.readPressure() / 101325;
     humidity = bme.readHumidity();
     gas = bme.readGas() / 1000;
-    iaqReference = calculateIAQ(gas,humidity);
+    iaqReference = calculateIAQ(bme.readGas(),humidity);
     altitude = bme.readAltitude(SEALEVELPRESSURE_HPA);
     // delay the task
     vTaskDelay(pdMS_TO_TICKS(500));
