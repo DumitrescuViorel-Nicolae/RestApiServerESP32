@@ -93,7 +93,6 @@ void getEnvPrincipal()
 void getEnvSecondary()
 {
   jsonDocument.clear();
-  add_json_object("gas", gas, "kOhms");
   add_json_object("iaq", iaqReference, "points");
   add_json_object("altitude", altitude, "m");
   serializeJson(jsonDocument, buffer);
@@ -145,7 +144,7 @@ float calculateIAQ(float gasResistance, float humidity)
   iaq += humidityWeight * (100 - humidityScore);
 
   // Etapa 2: Calculul scorului de gaz
-  iaq += 0.25 * (gasScore >= 0.25 ? (1 - gasScore) : gasScore);
+  iaq += 0.5 * (gasScore >= 0.5 ? gasScore : (1 - gasScore));
 
   return iaq;
 }
@@ -161,7 +160,7 @@ void bmeSensorReadings(void *parameter)
     iaqReference = calculateIAQ(bme.readGas(),humidity);
     altitude = bme.readAltitude(SEALEVELPRESSURE_HPA);
     // delay the task
-    vTaskDelay(pdMS_TO_TICKS(500));
+    vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }
 
